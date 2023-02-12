@@ -2,7 +2,10 @@
 require("dotenv").config();
 
 const mongoose = require("mongoose");
-const encrypt = require("mongoose-encryption")
+// const encrypt = require("mongoose-encryption");
+
+const bcrypt = require("bcrypt");
+const saltRounds = 10;
 
 mongoose.set("strictQuery", false);
 
@@ -19,8 +22,8 @@ const userSchema = new mongoose.Schema({
   password: String,
 });
 
-const secret = process.env.SECRET_DB
-userSchema.plugin(encrypt, {secret: secret, encryptedFields: ['password'] } )
+// const secret = process.env.SECRET_DB;
+// userSchema.plugin(encrypt, { secret: secret, encryptedFields: ["password"] });
 
 const User = mongoose.model(`User`, userSchema);
 
@@ -55,13 +58,20 @@ app.get("/register", (req, res) => {
 });
 
 app.post("/register", (req, res) => {
-  const newUser = new User({
-    email: req.body.username,
-    password: req.body.password,
-  });
-  newUser.save((err) => {
-    if (err) return console.log(err);
-    res.send("User registado com sucesso");
+  bcrypt.hash(req.body.password, saltRounds, (err, hash) => {
+    // Store hash in your password DB.
+    if (!err) {
+      const newUser = new User({
+        email: req.body.username,
+        password: hash,
+      });
+      newUser.save((err) => {
+        if (err) return console.log(err);
+        res.send("User registado com sucesso");
+      });
+    } else {
+      res.send("Erro no registo do user!");
+    }
   });
 });
 
@@ -74,11 +84,13 @@ app.post("/login", (req, res) => {
       console.log(err);
     } else {
       if (foundUser) {
-        if (foundUser.password === password) {
-          res.render("secrets");
-        } else {
-          res.send("Login failed!");
-        }
+        bcrypt.compare(password, foundUser.password, (err, result) => {
+          if (result === true) {
+            res.render("secrets");
+          } else {
+            res.send("Login failed");
+          }
+        });
       }
     }
   });
@@ -87,5 +99,3 @@ app.post("/login", (req, res) => {
 app.listen(port, function () {
   console.log("Server is running on port " + port);
 });
-
-// ***** comentario teste got ********
